@@ -7,18 +7,29 @@
         body { font-family: Arial, sans-serif; margin: 30px; background: #121212; color: #fff; }
         .container { display: flex; gap: 20px; }
         .box { flex: 1; padding: 20px; background: #1e1e1e; border-radius: 8px; border: 1px solid #333; }
-        button { padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; }
+        button { padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .start { background: #28a745; color: white; }
         .stop { background: #dc3545; color: white; }
+        .speak { background: #007bff; color: white; }
+        .recording { background: #ff3333; color: white; animation: pulse 1s infinite; }
         .nudge { background: #ff9800; color: #000; padding: 10px; border-radius: 4px; margin-top: 10px; font-weight: bold; }
         .transcript { height: 300px; overflow-y: auto; background: #000; padding: 10px; border-radius: 4px; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
     <h1>Salita Voice Agent - Live Call Studio</h1>
     <p>Status: <span id="status" style="color: yellow;">Disconnected</span></p>
     
-    <button id="callBtn" class="start" onclick="toggleCall()">Start Live Call</button>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <button id="callBtn" class="start" onclick="toggleCall()">Start Live Call</button>
+        <button id="speakBtn" class="speak" onclick="toggleSpeaking()" disabled>🎙️ Click to Speak</button>
+    </div>
     <br><br>
 
     <div class="container">
@@ -37,16 +48,33 @@
     </div>
 
     <script>
-        let ws, mediaRecorder, isCalling = false;
+        let ws, mediaRecorder, audioStream;
+        let isCalling = false;
+        let isRecording = false;
+        let audioChunks = [];
 
         async function toggleCall() {
             const btn = document.getElementById('callBtn');
+            const speakBtn = document.getElementById('speakBtn');
+
             if (!isCalling) {
+                try {
+                    // Get mic permission when call starts
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                } catch (err) {
+                    alert('Microphone access is required to make a call.');
+                    return;
+                }
+
                 ws = new WebSocket('ws://localhost:8000/ws/call');
+                
                 ws.onopen = () => {
                     document.getElementById('status').innerText = 'Connected / Live';
                     document.getElementById('status').style.color = '#28a745';
-                    startMic();
+                    btn.innerText = 'End Call';
+                    btn.className = 'stop';
+                    speakBtn.disabled = false;
+                    isCalling = true;
                 };
 
                 ws.onmessage = async (event) => {
@@ -75,29 +103,73 @@
                     }
                 };
 
-                btn.innerText = 'End Call';
-                btn.className = 'stop';
-                isCalling = true;
+                ws.onclose = () => {
+                    endCallSession();
+                };
+
             } else {
-                ws.close();
-                if (mediaRecorder) mediaRecorder.stop();
-                document.getElementById('status').innerText = 'Disconnected';
-                document.getElementById('status').style.color = 'yellow';
-                btn.innerText = 'Start Live Call';
-                btn.className = 'start';
-                isCalling = false;
+                if (ws) ws.close();
+                endCallSession();
             }
         }
 
-        async function startMic() {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-            mediaRecorder.ondataavailable = async (e) => {
-                if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-                    ws.send(e.data);
-                }
-            };
-            mediaRecorder.start(2500); // Send 2.5-second audio chunks
+        function toggleSpeaking() {
+            const speakBtn = document.getElementById('speakBtn');
+
+            if (!isRecording) {
+                // Start recording user audio turn
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        audioChunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    // Send complete audio blob on stop
+                    const completeBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    if (ws && ws.readyState === WebSocket.OPEN && completeBlob.size > 0) {
+                        ws.send(completeBlob);
+                    }
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                speakBtn.innerText = '🔴 Recording... Click to Send';
+                speakBtn.className = 'recording';
+            } else {
+                // Stop recording and trigger send
+                mediaRecorder.stop();
+                isRecording = false;
+                speakBtn.innerText = '🎙️ Click to Speak';
+                speakBtn.className = 'speak';
+            }
+        }
+
+        function endCallSession() {
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+            }
+            if (isRecording && mediaRecorder) {
+                mediaRecorder.stop();
+            }
+
+            const btn = document.getElementById('callBtn');
+            const speakBtn = document.getElementById('speakBtn');
+
+            document.getElementById('status').innerText = 'Disconnected';
+            document.getElementById('status').style.color = 'yellow';
+            
+            btn.innerText = 'Start Live Call';
+            btn.className = 'start';
+            speakBtn.innerText = '🎙️ Click to Speak';
+            speakBtn.className = 'speak';
+            speakBtn.disabled = true;
+
+            isCalling = false;
+            isRecording = false;
         }
     </script>
 </body>
