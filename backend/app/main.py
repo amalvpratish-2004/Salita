@@ -1,10 +1,11 @@
 from fastapi import FastAPI
-from app.api import knowledge
+from app.api import knowledge, agent
 
 app = FastAPI(title="Salita Voice Agent API")
 
-# Register our knowledge base endpoints
+# Register routes
 app.include_router(knowledge.router, prefix="/knowledge", tags=["Knowledge Base"])
+app.include_router(agent.router, prefix="/agent", tags=["Voice Agent"])
 
 @app.get("/")
 async def root():
