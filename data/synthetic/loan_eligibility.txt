@@ -1,0 +1,50 @@
+BUSINESS LOAN ELIGIBILITY POLICY
+Version: 1.0
+Effective Date: January 1, 2026
+
+IMPORTANT:
+This is synthetic/mock business material created for the AI Engineer Assessment.
+It does not represent a real financial institution.
+
+1. BUSINESS OPERATING PERIOD
+
+The applicant's business must have been operating for at least 2 years.
+
+Businesses operating for less than 2 years are not eligible for the standard business loan product.
+
+2. MONTHLY REVENUE
+
+The business must have an average monthly revenue of at least INR 50,000.
+
+Revenue may be verified using recent bank statements or other approved financial documents.
+
+3. REQUIRED DOCUMENTS
+
+Applicants must provide:
+
+- Government-issued identification
+- Business registration document
+- Recent bank statements
+- Proof of business address
+
+4. EXISTING LOANS
+
+An applicant may have existing loans.
+
+However, an applicant with an unresolved default on an existing loan is not eligible for the standard business loan product.
+
+5. LOAN PURPOSE
+
+The loan may be used for legitimate business purposes such as:
+
+- Purchasing equipment
+- Working capital
+- Business expansion
+- Inventory
+- Renovation of business premises
+
+6. HUMAN ASSISTANCE
+
+If an applicant has a question that is not covered by this policy, the applicant should be connected with a human representative.
+
+The AI assistant must not invent eligibility rules, interest rates, fees, approval decisions, or other financial commitments.

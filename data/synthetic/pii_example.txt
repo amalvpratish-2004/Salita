@@ -1,0 +1,7 @@
+CUSTOMER APPLICATION
+
+Applicant Name: Rahul Sharma
+Phone: 9876543210
+Email: rahul.sharma@example.com
+Business: Sharma Electronics
+Business Location: Kochi
