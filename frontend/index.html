@@ -8,6 +8,7 @@
         .container { display: flex; gap: 20px; }
         .box { flex: 1; padding: 20px; background: #1e1e1e; border-radius: 8px; border: 1px solid #333; }
         button { padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         .start { background: #28a745; color: white; }
         .stop { background: #dc3545; color: white; }
         .speak { background: #007bff; color: white; }
@@ -59,10 +60,9 @@
 
             if (!isCalling) {
                 try {
-                    // Get mic permission when call starts
                     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 } catch (err) {
-                    alert('Microphone access is required to make a call.');
+                    alert('Microphone access is required.');
                     return;
                 }
 
@@ -96,16 +96,31 @@
                                 </div>` + document.getElementById('nudges').innerHTML;
                         }
                     } else {
-                        // Play received TTS audio stream
+                        // Play binary TTS audio
                         const audioBlob = new Blob([event.data], { type: 'audio/mp3' });
                         const audioUrl = URL.createObjectURL(audioBlob);
-                        new Audio(audioUrl).play();
+                        const audio = new Audio(audioUrl);
+
+                        speakBtn.innerText = '🔊 Salita is speaking...';
+                        speakBtn.disabled = true;
+
+                        // Re-enable button ONLY after Salita finishes speaking
+                        audio.onended = () => {
+                            speakBtn.disabled = false;
+                            speakBtn.innerText = '🎙️ Click to Speak';
+                            speakBtn.className = 'speak';
+                        };
+
+                        audio.play().catch(e => {
+                            console.error('Audio playback failed:', e);
+                            speakBtn.disabled = false;
+                            speakBtn.innerText = '🎙️ Click to Speak';
+                            speakBtn.className = 'speak';
+                        });
                     }
                 };
 
-                ws.onclose = () => {
-                    endCallSession();
-                };
+                ws.onclose = () => endCallSession();
 
             } else {
                 if (ws) ws.close();
@@ -117,18 +132,14 @@
             const speakBtn = document.getElementById('speakBtn');
 
             if (!isRecording) {
-                // Start recording user audio turn
                 audioChunks = [];
                 mediaRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/webm' });
 
                 mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) {
-                        audioChunks.push(e.data);
-                    }
+                    if (e.data.size > 0) audioChunks.push(e.data);
                 };
 
                 mediaRecorder.onstop = () => {
-                    // Send complete audio blob on stop
                     const completeBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     if (ws && ws.readyState === WebSocket.OPEN && completeBlob.size > 0) {
                         ws.send(completeBlob);
@@ -140,21 +151,18 @@
                 speakBtn.innerText = '🔴 Recording... Click to Send';
                 speakBtn.className = 'recording';
             } else {
-                // Stop recording and trigger send
+                // Stop recording & lock button while processing
                 mediaRecorder.stop();
                 isRecording = false;
-                speakBtn.innerText = '🎙️ Click to Speak';
+                speakBtn.innerText = '⏳ Salita is thinking...';
                 speakBtn.className = 'speak';
+                speakBtn.disabled = true; 
             }
         }
 
         function endCallSession() {
-            if (audioStream) {
-                audioStream.getTracks().forEach(track => track.stop());
-            }
-            if (isRecording && mediaRecorder) {
-                mediaRecorder.stop();
-            }
+            if (audioStream) audioStream.getTracks().forEach(track => track.stop());
+            if (isRecording && mediaRecorder) mediaRecorder.stop();
 
             const btn = document.getElementById('callBtn');
             const speakBtn = document.getElementById('speakBtn');
