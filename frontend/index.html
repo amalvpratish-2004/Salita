@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Salita AI - Live Voice Call & Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; background: #121212; color: #fff; }
+        .container { display: flex; gap: 20px; }
+        .box { flex: 1; padding: 20px; background: #1e1e1e; border-radius: 8px; border: 1px solid #333; }
+        button { padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; }
+        .start { background: #28a745; color: white; }
+        .stop { background: #dc3545; color: white; }
+        .nudge { background: #ff9800; color: #000; padding: 10px; border-radius: 4px; margin-top: 10px; font-weight: bold; }
+        .transcript { height: 300px; overflow-y: auto; background: #000; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Salita Voice Agent - Live Call Studio</h1>
+    <p>Status: <span id="status" style="color: yellow;">Disconnected</span></p>
+    
+    <button id="callBtn" class="start" onclick="toggleCall()">Start Live Call</button>
+    <br><br>
+
+    <div class="container">
+        <div class="box">
+            <h3>Live Conversation</h3>
+            <div id="transcript" class="transcript"></div>
+        </div>
+        <div class="box">
+            <h3>Q4 Real-Time Nudges</h3>
+            <div id="nudges"><i>No nudges triggered yet...</i></div>
+            <hr>
+            <h4>Qualification State</h4>
+            <p>Status: <b id="qualStatus">INCOMPLETE</b></p>
+            <p>Missing Field: <b id="missingField">name</b></p>
+        </div>
+    </div>
+
+    <script>
+        let ws, mediaRecorder, isCalling = false;
+
+        async function toggleCall() {
+            const btn = document.getElementById('callBtn');
+            if (!isCalling) {
+                ws = new WebSocket('ws://localhost:8000/ws/call');
+                ws.onopen = () => {
+                    document.getElementById('status').innerText = 'Connected / Live';
+                    document.getElementById('status').style.color = '#28a745';
+                    startMic();
+                };
+
+                ws.onmessage = async (event) => {
+                    if (typeof event.data === "string") {
+                        const data = JSON.parse(event.data);
+                        if (data.type === "transcript") {
+                            const t = document.getElementById('transcript');
+                            t.innerHTML += `<p><b>${data.speaker}:</b> ${data.text}</p>`;
+                            t.scrollTop = t.scrollHeight;
+                            if (data.qualification_status) {
+                                document.getElementById('qualStatus').innerText = data.qualification_status;
+                                document.getElementById('missingField').innerText = data.missing_field || 'None';
+                            }
+                        } else if (data.type === "nudge") {
+                            document.getElementById('nudges').innerHTML = `
+                                <div class="nudge">
+                                    🚨 [${data.priority}] ${data.signal.toUpperCase()}<br>
+                                    ${data.text}
+                                </div>` + document.getElementById('nudges').innerHTML;
+                        }
+                    } else {
+                        // Play received TTS audio stream
+                        const audioBlob = new Blob([event.data], { type: 'audio/mp3' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        new Audio(audioUrl).play();
+                    }
+                };
+
+                btn.innerText = 'End Call';
+                btn.className = 'stop';
+                isCalling = true;
+            } else {
+                ws.close();
+                if (mediaRecorder) mediaRecorder.stop();
+                document.getElementById('status').innerText = 'Disconnected';
+                document.getElementById('status').style.color = 'yellow';
+                btn.innerText = 'Start Live Call';
+                btn.className = 'start';
+                isCalling = false;
+            }
+        }
+
+        async function startMic() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            mediaRecorder.ondataavailable = async (e) => {
+                if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+                    ws.send(e.data);
+                }
+            };
+            mediaRecorder.start(2500); // Send 2.5-second audio chunks
+        }
+    </script>
+</body>
+</html>

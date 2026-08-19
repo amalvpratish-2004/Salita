@@ -1,4 +1,6 @@
 import asyncio
+import os
+import platform
 import edge_tts
 
 async def generate_audio_stream(text: str, voice: str = "en-US-AriaNeural", output_path: str = "output.mp3"):
@@ -7,11 +9,19 @@ async def generate_audio_stream(text: str, voice: str = "en-US-AriaNeural", outp
     await communicate.save(output_path)
     return output_path
 
+async def generate_and_play_audio(text: str, voice: str = "en-US-AriaNeural", output_path: str = "output.mp3"):
+    """Generates an MP3 audio file from text and plays it locally."""
+    await generate_audio_stream(text, voice=voice, output_path=output_path)
+    print(f"Audio saved to: {output_path}")
+
+    if platform.system() == "Windows":
+        os.system(f'start "" "{output_path}"')
+    elif platform.system() == "Darwin":
+        os.system(f'afplay "{output_path}"')
+    else:
+        os.system(f'xdg-open "{output_path}"')
+
 if __name__ == "__main__":
-    # Test Taglish TTS generation
-    ph_text = "Hi po! Thank you for applying for a business loan with Salita."
-    ph_voice = "fil-PH-AngeloNeural"
-    
-    print("Testing edge-tts generation...")
-    asyncio.run(generate_audio_stream(ph_text, voice=ph_voice, output_path="ph_test.mp3"))
-    print("Audio file saved to ph_test.mp3")
+    # Quick sanity check
+    asyncio.run(generate_audio_stream("Testing TTS stream generation.", output_path="test_stream.mp3"))
+    print("TTS module initialized cleanly.")
