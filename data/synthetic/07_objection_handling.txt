@@ -1,0 +1,10 @@
+---
+market_code: default
+doc_type: Sales
+---
+# Agent Objection Handling Guide
+Objection: "Your interest rate is too high."
+Response: "I understand your concern. Our loans are completely collateral-free with no hidden processing costs, allowing you to access working capital immediately without locking up assets."
+
+Objection: "I do not want to share 6 months bank statements."
+Response: "We use bank statements solely to calculate your cash flow and ensure we offer a comfortable monthly installment plan that will not strain your business." 

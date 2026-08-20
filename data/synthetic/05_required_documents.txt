@@ -1,0 +1,10 @@
+---
+market_code: default
+doc_type: Operations
+---
+# Required Document Checklist
+To process a loan application, the customer must submit:
+1. Identity & Address Proof: Aadhaar Card, PAN Card, or Passport.
+2. Business Proof: GST Registration Certificate or Shops & Establishment License.
+3. Financial Records: Last 6 months bank statements for the main operating account.
+4. Income Verification: Latest GST returns (GSTR-3B) and ITR for the last financial year.

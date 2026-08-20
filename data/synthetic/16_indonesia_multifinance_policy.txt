@@ -1,0 +1,11 @@
+---
+market_code: ID
+doc_type: Multifinance
+---
+# Indonesia Market: Multifinance and Consumer Credit Rules
+Untuk nasabah di Indonesia:
+1. Persyaratan Usia: Minimal 21 tahun atau sudah menikah, maksimal 60 tahun saat tenor berakhir.
+2. Cicilan / Angsuran: Maksimal 40% dari pendapatan bulanan terverifikasi.
+3. Tenor / Jangka Waktu: Pilihan 6, 12, 18, atau 24 bulan.
+4. DP / Uang Muka: Minimal 10% untuk pembiayaan barang atau kendaraan.
+5. Denda Keterlambatan: 0.5% per hari dari nilai angsuran yang tertunggak.

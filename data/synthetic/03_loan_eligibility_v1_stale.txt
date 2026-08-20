@@ -1,0 +1,10 @@
+---
+market_code: default
+doc_type: eligibility_policy
+version: 1.0 (SUPERSEDED)
+---
+# Archive: Business Loan Policy (Deprecated 2024)
+Requirements for business financing:
+- Minimum business operating history of 1 year.
+- Minimum monthly turnover of ₹10,000.
+- Unresolved defaults permitted if under ₹25,000.

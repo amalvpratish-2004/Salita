@@ -1,0 +1,11 @@
+---
+market_code: default
+doc_type: Risk
+---
+# Prohibited Business Sectors
+Salita does NOT provide loans to businesses engaged in:
+- Cryptocurrencies or speculative digital asset trading.
+- Gambling, casinos, or betting operations.
+- Firearms, defense manufacturing, or ammunition.
+- Real estate land speculation.
+- Multi-level marketing (MLM) or pyramid schemes.

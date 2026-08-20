@@ -1,0 +1,11 @@
+---
+market_code: PH
+doc_type: Insurance
+---
+# Philippines Market: Bancassurance and Life Protection Policy
+Para sa customer sa Philippines:
+1. Eligibility: Ages 18 to 65 years old with valid government ID (SSS, UMID, Drivers License).
+2. Premium / Hulog: Starts at PHP 500 per month for basic coverage.
+3. Coverage / Proteksyon: Up to PHP 1,000,000 for natural death or total disability.
+4. Beneficiary / Tagapag-mana: Direct family members (spouse, children, parents).
+5. Monthly revenue requirements for financing: Minimum 30,000 PHP per month.

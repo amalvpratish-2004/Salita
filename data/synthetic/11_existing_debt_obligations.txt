@@ -1,0 +1,7 @@
+---
+market_code: default
+doc_type: Underwriting
+---
+# Debt Obligation and FOIR Policy
+1. Maximum Fixed Obligation to Income Ratio (FOIR): Total monthly EMI obligations (including proposed loan) cannot exceed 50% of verified average monthly revenue.
+2. Existing Default Rule: Any active or unresolved payment default on CIBIL/Equifax instantly disqualifies the applicant.

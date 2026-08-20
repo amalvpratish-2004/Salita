@@ -1,73 +1,98 @@
 import os
+import re
+import csv
+import sys
 from pathlib import Path
-import chromadb
 
-# Import all the modules we built and tested
-from loader import load_document
-from cleaner import clean_text
-from pii import mask_pii
-from chunker import chunk_text
-from metadata import add_metadata
-from embeddings import generate_embeddings
-
-# Setup paths dynamically
 current_dir = Path(__file__).resolve().parent
-salita_root = current_dir.parent.parent.parent
-synthetic_dir = salita_root / "data" / "synthetic"
-chroma_path = salita_root / "data" / "chroma"
+backend_dir = current_dir.parent.parent
+sys.path.append(str(backend_dir / "app" / "rag"))
 
-# Connect to ChromaDB
-client = chromadb.PersistentClient(path=str(chroma_path))
-collection = client.get_or_create_collection(name="business_knowledge")
+import chromadb
+from chromadb.utils import embedding_functions
 
-def process_directory():
-    print(f"Scanning directory: {synthetic_dir}")
+DATA_DIR = backend_dir.parent / "data" / "synthetic"
+CHROMA_DB_DIR = backend_dir / "chroma_db"
+
+def extract_market_code(file_path: Path, content: str) -> str:
+    """Extract market_code from YAML metadata or filename."""
+    if "market_code: PH" in content or "_philippines_" in file_path.name:
+        return "PH"
+    if "market_code: ID" in content or "_indonesia_" in file_path.name:
+        return "ID"
+    return "EN"
+
+def load_and_parse_files(data_dir: Path):
+    documents = []
+    metadatas = []
+    ids = []
     
-    # Loop through all files in the synthetic folder
-    for filename in os.listdir(synthetic_dir):
-        # Skip hidden files or unsupported types if needed
-        if filename.startswith('.'):
+    doc_id = 0
+    for file_path in data_dir.glob("*"):
+        if file_path.suffix not in [".txt", ".csv"]:
             continue
             
-        file_path = synthetic_dir / filename
-        print(f"\n--- Processing: {filename} ---")
+        market_code = "EN"
+        raw_text = ""
+
+        if file_path.suffix == ".txt":
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw_text = f.read()
+            market_code = extract_market_code(file_path, raw_text)
+
+        elif file_path.suffix == ".csv":
+            rows = []
+            with open(file_path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    rows.append(" | ".join(row))
+            raw_text = f"CSV File ({file_path.name}):\n" + "\n".join(rows)
+
+        # Basic paragraph chunking to avoid splitting mid-sentence
+        chunks = [c.strip() for c in re.split(r'\n\s*\n', raw_text) if len(c.strip()) > 20]
         
-        # 1. Load, Clean, and Mask PII
-        raw_text = load_document(file_path)
-        if not raw_text:
-            continue
-            
-        clean = clean_text(raw_text)
-        safe_text = mask_pii(clean) # <--- PII masking is now applied!
-        
-        # 2. Chunk & Metadata
-        chunks = chunk_text(safe_text)
-        documents = add_metadata(chunks, source=filename)
-        
-        # 3. Embed
-        embeddings = generate_embeddings(chunks)
-        
-        # 4. Prepare for Database
-        ids = []
-        texts = []
-        metadatas = []
-        
-        for i, doc in enumerate(documents):
-            # Create a unique ID using the filename to prevent overlaps
-            ids.append(f"{filename}_chunk_{i}")
-            texts.append(doc["text"])
-            metadatas.append(doc["metadata"])
-            
-        # 5. Store (using upsert so we can run this script safely multiple times)
-        collection.upsert(
-            ids=ids,
-            documents=texts,
-            embeddings=embeddings,
-            metadatas=metadatas
-        )
-        print(f"Successfully upserted {len(chunks)} chunks.")
-        
-    print(f"\nTotal chunks currently in Knowledge Base: {collection.count()}")
+        for idx, chunk in enumerate(chunks):
+            doc_id += 1
+            documents.append(chunk)
+            metadatas.append({
+                "source": file_path.name,
+                "market_code": market_code,
+                "chunk_index": idx
+            })
+            ids.append(f"doc_{doc_id}")
+
+    return documents, metadatas, ids
+
+def ingest_knowledge_base():
+    print(f"Reading files from {DATA_DIR}...")
+    documents, metadatas, ids = load_and_parse_files(DATA_DIR)
+    
+    if not documents:
+        print("❌ No documents found to ingest!")
+        return
+
+    print(f"Loaded {len(documents)} text chunks from {DATA_DIR.name}.")
+
+    client = chromadb.PersistentClient(path=str(CHROMA_DB_DIR))
+    
+    # Reset collection to ensure fresh indexing
+    try:
+        client.delete_collection(name="salita_kb")
+    except Exception:
+        pass
+
+    collection = client.create_collection(
+        name="salita_kb",
+        metadata={"hnsw:space": "cosine"}
+    )
+
+    collection.add(
+        documents=documents,
+        metadatas=metadatas,
+        ids=ids
+    )
+
+    print(f"✅ Successfully ingested {len(documents)} chunks into ChromaDB at {CHROMA_DB_DIR}.")
 
 if __name__ == "__main__":
-    process_directory()
+    ingest_knowledge_base()

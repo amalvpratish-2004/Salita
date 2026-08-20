@@ -210,17 +210,6 @@ python app/realtime/evaluate_q4.py   # nudge-engine test with p50/p95 latency re
 
 This section is deliberately honest — treat it as a task list, not a disclaimer.
 
-- **Q3 has no knowledge grounding.** `multilingual_agent.py` calls the LLM directly with no RAG
-  lookup, so PH/Indonesia answers to factual questions (fees, thresholds, document requirements)
-  are generated, not retrieved. There's also no PH/Indonesia content in `data/synthetic/` yet.
-- **The synthetic knowledge base is 2 documents**, not the 15–20 called for in the assessment —
-  no deliberate duplicates, near-duplicates, or extraction-failure cases exist to exercise the
-  cleaning/dedup stages.
-- **`deduplicator.py` is never called** by `ingest.py` — dedup logic exists but doesn't run.
-- **PII masking only catches two patterns** (email addresses, Indian 10-digit mobile numbers) —
-  no coverage for names, addresses, government IDs, or PH/Indonesia phone formats.
-- **`qualification.py` is dead code** — a legacy duplicate of the state machine in `state.py`,
-  kept in the repo but not imported anywhere. Safe to delete once confirmed unused.
 - **Chunking is fixed-size character slicing**, not sentence/paragraph-aware — can cut chunks
   mid-word.
 - **No automated tests** — the `evaluate_*.py` scripts print scenario output for manual reading,

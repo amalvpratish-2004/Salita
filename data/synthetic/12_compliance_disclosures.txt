@@ -1,0 +1,8 @@
+---
+market_code: default
+doc_type: Legal
+---
+# Regulatory Compliance and Fair Practices
+1. Salita operates in compliance with RBI Digital Lending Guidelines.
+2. Key Fact Statement (KFS) containing APR, processing fees, and repayment schedules will be issued prior to loan agreement signing.
+3. Customer data is encrypted and never sold to third parties.

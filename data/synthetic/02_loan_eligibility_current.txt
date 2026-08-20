@@ -1,0 +1,12 @@
+---
+market_code: default
+doc_type: eligibility_policy
+version: 2.0 (Active)
+---
+# Current Business Loan Eligibility Criteria (Updated 2026)
+To qualify for a Salita Business Loan, applicants must meet ALL of the following criteria:
+1. Business Operating History: Minimum 2 years of continuous operational history.
+2. Revenue Threshold: Minimum monthly revenue of ₹50,000 (₹600,000 annually).
+3. Credit History: Zero unresolved defaults on any personal or business credit lines.
+4. Business Registration: Registered entity with valid GSTIN and active business bank account.
+5. Entity Types: Sole proprietorships, partnerships, LLPs, and Private Limited companies.

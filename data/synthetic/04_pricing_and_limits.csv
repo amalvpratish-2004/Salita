@@ -1,0 +1,5 @@
+Credit_Score_Band,Min_Monthly_Revenue,Max_Loan_Amount,Annual_Interest_Rate
+750+,50000,5000000,14%
+700-749,50000,3000000,16.5%
+650-699,75000,1500000,19%
+Below 650,100000,500000,22%

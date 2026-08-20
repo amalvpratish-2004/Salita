@@ -1,0 +1,11 @@
+---
+market_code: default
+doc_type: Clean_Test
+---
+# Fee Structure Breakdown
+[CORRUPT TABLE START]
+Fee_Type | Amount || Status
+ProcessingFee | 2% || Mandatory
+Late Penalty | ₹500/day || If_Overdue
+Prepayment | Nil || After_6_m
+[CORRUPT TABLE END]

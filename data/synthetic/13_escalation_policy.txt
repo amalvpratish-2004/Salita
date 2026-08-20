@@ -1,0 +1,9 @@
+---
+market_code: default
+doc_type: Escalation
+---
+# Call Escalation Protocol
+An AI agent MUST immediately offer human supervisor escalation when:
+1. The customer explicitly asks to speak to a human or manager.
+2. The customer raises a formal legal or regulatory compliance dispute.
+3. The customer poses a complex question outside the knowledge base context twice consecutively.

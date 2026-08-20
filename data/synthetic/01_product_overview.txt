@@ -1,0 +1,11 @@
+---
+market_code: default
+doc_type: product_overview
+---
+# Salita Business Capital Loan - Overview
+Salita Financial Services provides unsecured business capital loans designed to support working capital, inventory purchases, and business expansion.
+Features:
+- Loan amounts ranging from ₹100,000 to ₹5,000,000.
+- Flexible repayment terms from 12 to 36 months.
+- No collateral required for qualified business owners.
+- Fast digital processing within 24 to 48 hours.

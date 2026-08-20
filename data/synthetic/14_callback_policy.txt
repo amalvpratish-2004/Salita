@@ -1,0 +1,7 @@
+---
+market_code: default
+doc_type: Operations
+---
+# Customer Callback Scheduling Policy
+1. Callbacks can be scheduled between 9:00 AM and 7:00 PM local time, Monday to Saturday.
+2. Callback SLA: A human relationship manager will reach out within 2 operational hours of request creation.

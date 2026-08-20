@@ -1,0 +1,8 @@
+---
+market_code: default
+doc_type: Underwriting
+---
+# Revenue Verification Policy
+1. Monthly Revenue Calculation: Calculated using the 6-month average cash credit/current account deposits.
+2. Intra-account transfers and self-transfers are excluded from monthly revenue calculations.
+3. Revenue Variance: If GST returns show a variance >30% compared to bank credits, the lower figure is used.

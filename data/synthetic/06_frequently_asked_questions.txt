@@ -1,0 +1,13 @@
+---
+market_code: default
+doc_type: FAQ
+---
+# Business Loan FAQs
+Q: What is the interest rate?
+A: Rates range from 14% to 22% per annum depending on credit profile and monthly turnover.
+
+Q: Is there a pre-payment penalty?
+A: No foreclosure fees after completing 6 timely monthly installments.
+
+Q: How long does approval take?
+A: Preliminary qualification takes less than 5 minutes. Full disbursement takes 24-48 hours.

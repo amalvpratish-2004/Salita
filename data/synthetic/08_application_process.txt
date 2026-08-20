@@ -1,0 +1,10 @@
+---
+market_code: default
+doc_type: Process
+---
+# End-to-End Application Workflow
+1. Initial Screening: Agent verifies basic business details (Name, Revenue, Tenure, Default history).
+2. Qualification Status: State evaluates to QUALIFIED or DISQUALIFIED.
+3. Document Upload: Applicant submits 6-month bank statement link.
+4. Automated Underwriting: System checks FOIR and revenue consistency.
+5. Final Disbursement: Funds credited directly to business bank account.

@@ -1,0 +1,9 @@
+---
+market_code: default
+doc_type: Vector_Test
+---
+# Commercial Loan Standard Requirements
+Criteria for securing a corporate business credit facility:
+- Business operational tenure must be a minimum of two full years (24 months).
+- Verified monthly income must be at least ₹50,000.
+- No historical credit defaults that remain outstanding.

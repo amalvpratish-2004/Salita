@@ -1,40 +1,91 @@
+import os
 import sys
+import json
 from pathlib import Path
+from typing import Tuple, Optional
+from google import genai
 
-# Add paths for imports
 current_dir = Path(__file__).resolve().parent
 backend_dir = current_dir.parent.parent
 sys.path.append(str(backend_dir / "app" / "ai"))
+sys.path.append(str(backend_dir / "app" / "rag"))
+sys.path.append(str(backend_dir / "app" / "agent"))
 
-from llm import generate_llm_response
-from market_config import get_market_config, MarketConfig
+from market_config import get_market_config
+from retriever import KBRetriever
+from state import ApplicationState  # Qualification State Tracker
+
 
 class LocalizedVoiceAgent:
-    def __init__(self, market_code: str):
-        self.config: MarketConfig = get_market_config(market_code)
-        self.conversation_history = []
+    def __init__(self, market_code: str = "PH"):
+        self.market_code = market_code.upper()
+        self.config = get_market_config(self.market_code)
+        self.retriever = KBRetriever()
+        self.state = ApplicationState()  # Connects eligibility state machine
 
-    def process_message(self, user_message: str) -> str:
-        self.conversation_history.append({"role": "user", "content": user_message})
+        api_key = os.getenv("GEMINI_API_KEY")
+        self.client = genai.Client(api_key=api_key) if api_key else None
 
+    def _extract_slots_and_respond(self, user_text: str, context: str) -> str:
+        """Extracts slot data (revenue, tenure, defaults) while generating localized response."""
         system_prompt = f"""{self.config.system_instruction}
 
-Market Sector: {self.config.sector}
-Key Terminology Mapping:
+Knowledge Base Grounding Context:
+{context if context else 'No specific document retrieved.'}
+
+Key Financial Terminology Reference:
 {self.config.key_terms}
 
-Response Guidelines:
-1. Respond naturally in {self.config.primary_language}.
-2. Maintain appropriate market register and politeness.
-3. Keep response under 3 concise sentences for clear text-to-speech rendering.
-4. Adapt naturally to the user's input rather than providing literal line-by-line translations.
+Current Known State of Applicant:
+- Monthly Revenue: {self.state.monthly_revenue or 'Unknown'}
+- Business Tenure Years: {self.state.business_tenure_years or 'Unknown'}
+- Active Defaults: {self.state.has_defaults if self.state.has_defaults is not None else 'Unknown'}
+
+Instructions:
+1. Extract any financial variables mentioned by the customer.
+2. Formulate a conversational response in {self.config.primary_language} answering their question or asking for missing eligibility information.
+3. Output MUST be valid JSON with two fields:
+   "extracted": {{"monthly_revenue": int or null, "business_tenure_years": float or null, "has_defaults": bool or null}},
+   "response": "Your spoken conversational response"
 """
 
-        response = generate_llm_response(user_message, system_prompt=system_prompt)
-        self.conversation_history.append({"role": "assistant", "content": response})
-        return response
+        if not self.client:
+            return f"[Mock {self.market_code}] Maraming salamat po! Regarding '{user_text}', we require 2 years business history."
 
-if __name__ == "__main__":
-    agent_ph = LocalizedVoiceAgent("PH")
-    reply = agent_ph.process_message("Magkano po ang kailangan para sa business loan?")
-    print(f"[PH Agent Reply]:\n{reply}")
+        try:
+            res = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[
+                    {"role": "user", "parts": [{"text": system_prompt + f"\n\nCustomer: {user_text}"}]}
+                ]
+            )
+            raw = res.text.strip()
+            # Clean markdown JSON block if present
+            if "```json" in raw:
+                raw = raw.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw:
+                raw = raw.split("```")[1].split("```")[0].strip()
+
+            parsed = json.loads(raw)
+
+            # Update state with extracted slots
+            extracted = parsed.get("extracted", {})
+            if extracted.get("monthly_revenue"):
+                self.state.monthly_revenue = float(extracted["monthly_revenue"])
+            if extracted.get("business_tenure_years"):
+                self.state.business_tenure_years = float(extracted["business_tenure_years"])
+            if extracted.get("has_defaults") is not None:
+                self.state.has_defaults = bool(extracted["has_defaults"])
+
+            return parsed.get("response", raw)
+
+        except Exception as e:
+            print(f"[Agent Extraction Error] {e}")
+            return "Pasensya na po, paki-ulit lang po ng inyong katanungan."
+
+    def process_message(self, user_text: str) -> str:
+        # 1. Retrieve market-filtered knowledge chunks
+        context = self.retriever.query(user_text, market_code=self.market_code, top_k=2)
+
+        # 2. Extract slots and generate localized agent response
+        return self._extract_slots_and_respond(user_text, context)
