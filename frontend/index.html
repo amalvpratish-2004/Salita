@@ -62,6 +62,122 @@
         let isRecording = false;
         let audioChunks = [];
 
+        // --- Progressive TTS playback state ---
+        const MSE_SUPPORTED = window.MediaSource && MediaSource.isTypeSupported('audio/mpeg');
+        let mediaSource, sourceBuffer, ttsAudioEl, pendingAudioChunks = [], streamEnded = false;
+        let fallbackChunks = []; // used only when MSE isn't supported (e.g. Safari)
+
+        // --- Text held back until audio is actually audible ---
+        let pendingSalitaMessage = null; // { text, qualification_status, missing_field }
+
+        function showTypingIndicator() {
+            const t = document.getElementById('transcript');
+            if (document.getElementById('typingIndicator')) return;
+            t.innerHTML += `<p id="typingIndicator"><b>Salita:</b> <i>…</i></p>`;
+            t.scrollTop = t.scrollHeight;
+        }
+
+        function revealPendingSalitaMessage() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+
+            if (!pendingSalitaMessage) return;
+            const t = document.getElementById('transcript');
+            t.innerHTML += `<p><b>Salita:</b> ${pendingSalitaMessage.text}</p>`;
+            t.scrollTop = t.scrollHeight;
+
+            document.getElementById('qualStatus').innerText = pendingSalitaMessage.qualification_status || 'N/A';
+            document.getElementById('missingField').innerText = pendingSalitaMessage.missing_field || 'None';
+            pendingSalitaMessage = null;
+        }
+
+        function resetSpeakButton() {
+            const speakBtn = document.getElementById('speakBtn');
+            speakBtn.disabled = false;
+            speakBtn.innerText = '🎙️ Click to Speak';
+            speakBtn.className = 'speak';
+        }
+
+        function appendNextAudioChunk() {
+            if (sourceBuffer && !sourceBuffer.updating && pendingAudioChunks.length > 0) {
+                sourceBuffer.appendBuffer(pendingAudioChunks.shift());
+            }
+        }
+
+        function startAudioStream() {
+            const speakBtn = document.getElementById('speakBtn');
+            speakBtn.innerText = '🔊 Salita is speaking...';
+            speakBtn.disabled = true;
+            streamEnded = false;
+
+            if (!MSE_SUPPORTED) {
+                fallbackChunks = [];
+                return;
+            }
+
+            pendingAudioChunks = [];
+            mediaSource = new MediaSource();
+            ttsAudioEl = new Audio();
+            ttsAudioEl.src = URL.createObjectURL(mediaSource);
+            ttsAudioEl.onended = resetSpeakButton;
+            ttsAudioEl.onerror = () => { resetSpeakButton(); revealPendingSalitaMessage(); };
+
+            mediaSource.addEventListener('sourceopen', () => {
+                sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
+                sourceBuffer.addEventListener('updateend', appendNextAudioChunk);
+                appendNextAudioChunk();
+            }, { once: true });
+
+            // Play as soon as the browser has buffered enough to start.
+            ttsAudioEl.addEventListener('canplay', () => {
+                ttsAudioEl.play().catch(() => {});
+            }, { once: true });
+
+            // Reveal the held-back text at the moment sound actually starts, not before.
+            ttsAudioEl.addEventListener('playing', revealPendingSalitaMessage, { once: true });
+        }
+
+        function pushAudioChunk(arrayBuffer) {
+            if (!MSE_SUPPORTED) {
+                fallbackChunks.push(arrayBuffer);
+                return;
+            }
+            pendingAudioChunks.push(arrayBuffer);
+            appendNextAudioChunk();
+        }
+
+        function endAudioStream() {
+            streamEnded = true;
+
+            if (!MSE_SUPPORTED) {
+                const blob = new Blob(fallbackChunks, { type: 'audio/mp3' });
+                const audio = new Audio(URL.createObjectURL(blob));
+                const speakBtn = document.getElementById('speakBtn');
+                speakBtn.innerText = '🔊 Salita is speaking...';
+                speakBtn.disabled = true;
+                audio.onended = resetSpeakButton;
+                audio.onerror = resetSpeakButton;
+                audio.addEventListener('playing', revealPendingSalitaMessage, { once: true });
+                audio.play().catch(() => { resetSpeakButton(); revealPendingSalitaMessage(); });
+                return;
+            }
+
+            const tryClose = () => {
+                if (!sourceBuffer || (!sourceBuffer.updating && pendingAudioChunks.length === 0)) {
+                    if (mediaSource && mediaSource.readyState === 'open') {
+                        try { mediaSource.endOfStream(); } catch (e) { /* already closed */ }
+                    }
+                    // Safety net: if playback hasn't started within 4s of the stream fully
+                    // arriving (e.g. autoplay blocked, decode stall), show the text anyway
+                    // rather than leaving it hidden indefinitely.
+                    setTimeout(revealPendingSalitaMessage, 4000);
+                } else {
+                    setTimeout(tryClose, 30);
+                }
+            };
+            tryClose();
+        }
+
         async function toggleCall() {
             const btn = document.getElementById('callBtn');
             const speakBtn = document.getElementById('speakBtn');
@@ -78,7 +194,8 @@
                 // Pass the selected market code to backend (EN, PH, or ID)
                 const selectedMarket = marketSelect.value;
                 ws = new WebSocket(`ws://localhost:8000/ws/call?market=${selectedMarket}`);
-                
+                ws.binaryType = 'arraybuffer'; // deliver binary frames as ArrayBuffer, not Blob
+
                 ws.onopen = () => {
                     document.getElementById('status').innerText = `Connected / Live (${selectedMarket})`;
                     document.getElementById('status').style.color = '#28a745';
@@ -93,40 +210,35 @@
                     if (typeof event.data === "string") {
                         const data = JSON.parse(event.data);
                         if (data.type === "transcript") {
-                            const t = document.getElementById('transcript');
-                            t.innerHTML += `<p><b>${data.speaker}:</b> ${data.text}</p>`;
-                            t.scrollTop = t.scrollHeight;
-                            
-                            document.getElementById('qualStatus').innerText = data.qualification_status || 'N/A';
-                            document.getElementById('missingField').innerText = data.missing_field || 'None';
+                            if (data.speaker === "User") {
+                                const t = document.getElementById('transcript');
+                                t.innerHTML += `<p><b>${data.speaker}:</b> ${data.text}</p>`;
+                                t.scrollTop = t.scrollHeight;
+                            } else {
+                                // Hold Salita's text back — it's revealed by revealPendingSalitaMessage()
+                                // once audio playback actually starts, so text and voice land together.
+                                pendingSalitaMessage = {
+                                    text: data.text,
+                                    qualification_status: data.qualification_status,
+                                    missing_field: data.missing_field
+                                };
+                                showTypingIndicator();
+                            }
                         } else if (data.type === "nudge") {
                             document.getElementById('nudges').innerHTML = `
                                 <div class="nudge">
                                     🚨 [${data.priority}] ${data.signal.toUpperCase()}<br>
                                     ${data.text}
                                 </div>` + document.getElementById('nudges').innerHTML;
+                        } else if (data.type === "audio_start") {
+                            startAudioStream();
+                        } else if (data.type === "audio_end") {
+                            endAudioStream();
                         }
                     } else {
-                        // Play localized TTS binary audio
-                        const audioBlob = new Blob([event.data], { type: 'audio/mp3' });
-                        const audioUrl = URL.createObjectURL(audioBlob);
-                        const audio = new Audio(audioUrl);
-
-                        speakBtn.innerText = '🔊 Salita is speaking...';
-                        speakBtn.disabled = true;
-
-                        audio.onended = () => {
-                            speakBtn.disabled = false;
-                            speakBtn.innerText = '🎙️ Click to Speak';
-                            speakBtn.className = 'speak';
-                        };
-
-                        audio.play().catch(e => {
-                            console.error('Audio playback failed:', e);
-                            speakBtn.disabled = false;
-                            speakBtn.innerText = '🎙️ Click to Speak';
-                            speakBtn.className = 'speak';
-                        });
+                        // Binary WS frame = one chunk of the TTS stream. Push it straight into
+                        // the player instead of waiting to collect the whole response.
+                        pushAudioChunk(event.data);
                     }
                 };
 

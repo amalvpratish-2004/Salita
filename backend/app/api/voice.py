@@ -1,4 +1,3 @@
-import io
 import sys
 import asyncio
 import edge_tts
@@ -82,14 +81,13 @@ async def voice_call_endpoint(websocket: WebSocket, market: str = "EN"):
                 "missing_field": missing_field
             })
 
-            # 4. Synthesize Audio Using Dynamic Voice
+            # 4. Stream Audio Progressively (no full-buffer wait before the first byte reaches the client)
+            await websocket.send_json({"type": "audio_start"})
             communicate = edge_tts.Communicate(agent_text, tts_voice)
-            buffer = io.BytesIO()
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
-                    buffer.write(chunk["data"])
-
-            await websocket.send_bytes(buffer.getvalue())
+                    await websocket.send_bytes(chunk["data"])
+            await websocket.send_json({"type": "audio_end"})
 
     except WebSocketDisconnect:
         print(f"[WebSocket] Client disconnected from {market_code} market session.")
