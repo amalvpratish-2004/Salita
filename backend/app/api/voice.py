@@ -1,5 +1,6 @@
 import io
 import sys
+import asyncio
 import edge_tts
 from pathlib import Path
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -12,30 +13,51 @@ sys.path.append(str(backend_dir / "app" / "realtime"))
 
 from asr import transcribe_audio_bytes
 from orchestrator import LoanAgentOrchestrator
+from multilingual_agent import LocalizedVoiceAgent
 from signals import NudgeEngine
+from market_config import get_market_config  # Imported your exact function
 
 router = APIRouter()
 nudge_engine = NudgeEngine()
 
 @router.websocket("/ws/call")
-async def voice_call_endpoint(websocket: WebSocket):
+async def voice_call_endpoint(websocket: WebSocket, market: str = "EN"):
     await websocket.accept()
-    orchestrator = LoanAgentOrchestrator()
-    print("[WebSocket] Client connected to live call.")
+    
+    market_code = market.upper()
+    
+    # 1. Market Routing & Voice/ASR Selection
+    if market_code in ["PH", "ID"]:
+        market_cfg = get_market_config(market_code)
+        tts_voice = market_cfg.tts_voice_female
+        # faster-whisper uses "tl" for Tagalog/Taglish and "id" for Indonesia
+        asr_lang = "tl" if market_code == "PH" else "id"
+        orchestrator = LocalizedVoiceAgent(market_code=market_code)
+    else:
+        # Default to English
+        tts_voice = "en-US-AriaNeural"
+        asr_lang = "en"
+        orchestrator = LoanAgentOrchestrator()
+
+    print(f"[WebSocket] Client connected. Market: {market_code}")
 
     try:
         while True:
             audio_data = await websocket.receive_bytes()
 
-            # 1. Speech to Text
-            user_text = transcribe_audio_bytes(audio_data)
+            # 2. Transcribe Audio (passing the market language to ASR)
+            user_text = await asyncio.to_thread(transcribe_audio_bytes, audio_data, language=asr_lang)
             if not user_text:
                 continue
 
             await websocket.send_json({"type": "transcript", "speaker": "User", "text": user_text})
 
-            # 2. Real-time Nudge Check
-            nudge = nudge_engine.analyze_transcript_chunk(f"Customer: {user_text}")
+            # 3. Concurrent Execution of Nudge and Agent (Solves the latency delay)
+            nudge_task = asyncio.to_thread(nudge_engine.analyze_transcript_chunk, f"Customer: {user_text}")
+            agent_task = asyncio.to_thread(orchestrator.process_message, user_text)
+
+            nudge, agent_text = await asyncio.gather(nudge_task, agent_task)
+
             if nudge:
                 await websocket.send_json({
                     "type": "nudge",
@@ -45,20 +67,23 @@ async def voice_call_endpoint(websocket: WebSocket):
                     "priority": nudge.priority
                 })
 
-            # 3. Agent Processing
-            agent_text = orchestrator.process_message(user_text)
-            status, _ = orchestrator.state.evaluate_eligibility()
+            # Safely check state (Checklist Item #3 notes that LocalizedVoiceAgent doesn't have a state machine yet)
+            status = "N/A"
+            missing_field = None
+            if hasattr(orchestrator, "state"):
+                status, _ = orchestrator.state.evaluate_eligibility()
+                missing_field = orchestrator.state.get_missing_field()
 
             await websocket.send_json({
                 "type": "transcript",
                 "speaker": "Salita",
                 "text": agent_text,
                 "qualification_status": status,
-                "missing_field": orchestrator.state.get_missing_field()
+                "missing_field": missing_field
             })
 
-            # 4. In-Memory TTS Audio Generation (Zero Disk Latency)
-            communicate = edge_tts.Communicate(agent_text, "en-US-AriaNeural")
+            # 4. Synthesize Audio Using Dynamic Voice
+            communicate = edge_tts.Communicate(agent_text, tts_voice)
             buffer = io.BytesIO()
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
@@ -67,4 +92,4 @@ async def voice_call_endpoint(websocket: WebSocket):
             await websocket.send_bytes(buffer.getvalue())
 
     except WebSocketDisconnect:
-        print("[WebSocket] Client disconnected.")
+        print(f"[WebSocket] Client disconnected from {market_code} market session.")

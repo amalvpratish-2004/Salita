@@ -7,8 +7,9 @@
         body { font-family: Arial, sans-serif; margin: 30px; background: #121212; color: #fff; }
         .container { display: flex; gap: 20px; }
         .box { flex: 1; padding: 20px; background: #1e1e1e; border-radius: 8px; border: 1px solid #333; }
-        button { padding: 12px 24px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button, select { padding: 12px 20px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        select { background: #2a2a2a; color: #fff; border: 1px solid #444; }
+        button:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
         .start { background: #28a745; color: white; }
         .stop { background: #dc3545; color: white; }
         .speak { background: #007bff; color: white; }
@@ -27,7 +28,14 @@
     <h1>Salita Voice Agent - Live Call Studio</h1>
     <p>Status: <span id="status" style="color: yellow;">Disconnected</span></p>
     
-    <div style="display: flex; gap: 10px; align-items: center;">
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <label for="marketSelect"><b>Market Region:</b></label>
+        <select id="marketSelect">
+            <option value="EN">🇺🇸 English (US)</option>
+            <option value="PH">🇵🇭 Philippines (Taglish)</option>
+            <option value="ID">🇮🇩 Indonesia (Bahasa)</option>
+        </select>
+
         <button id="callBtn" class="start" onclick="toggleCall()">Start Live Call</button>
         <button id="speakBtn" class="speak" onclick="toggleSpeaking()" disabled>🎙️ Click to Speak</button>
     </div>
@@ -43,8 +51,8 @@
             <div id="nudges"><i>No nudges triggered yet...</i></div>
             <hr>
             <h4>Qualification State</h4>
-            <p>Status: <b id="qualStatus">INCOMPLETE</b></p>
-            <p>Missing Field: <b id="missingField">name</b></p>
+            <p>Status: <b id="qualStatus">N/A</b></p>
+            <p>Missing Field: <b id="missingField">None</b></p>
         </div>
     </div>
 
@@ -57,6 +65,7 @@
         async function toggleCall() {
             const btn = document.getElementById('callBtn');
             const speakBtn = document.getElementById('speakBtn');
+            const marketSelect = document.getElementById('marketSelect');
 
             if (!isCalling) {
                 try {
@@ -66,14 +75,17 @@
                     return;
                 }
 
-                ws = new WebSocket('ws://localhost:8000/ws/call');
+                // Pass the selected market code to backend (EN, PH, or ID)
+                const selectedMarket = marketSelect.value;
+                ws = new WebSocket(`ws://localhost:8000/ws/call?market=${selectedMarket}`);
                 
                 ws.onopen = () => {
-                    document.getElementById('status').innerText = 'Connected / Live';
+                    document.getElementById('status').innerText = `Connected / Live (${selectedMarket})`;
                     document.getElementById('status').style.color = '#28a745';
                     btn.innerText = 'End Call';
                     btn.className = 'stop';
                     speakBtn.disabled = false;
+                    marketSelect.disabled = true; // Lock dropdown while in active call
                     isCalling = true;
                 };
 
@@ -84,10 +96,9 @@
                             const t = document.getElementById('transcript');
                             t.innerHTML += `<p><b>${data.speaker}:</b> ${data.text}</p>`;
                             t.scrollTop = t.scrollHeight;
-                            if (data.qualification_status) {
-                                document.getElementById('qualStatus').innerText = data.qualification_status;
-                                document.getElementById('missingField').innerText = data.missing_field || 'None';
-                            }
+                            
+                            document.getElementById('qualStatus').innerText = data.qualification_status || 'N/A';
+                            document.getElementById('missingField').innerText = data.missing_field || 'None';
                         } else if (data.type === "nudge") {
                             document.getElementById('nudges').innerHTML = `
                                 <div class="nudge">
@@ -96,7 +107,7 @@
                                 </div>` + document.getElementById('nudges').innerHTML;
                         }
                     } else {
-                        // Play binary TTS audio
+                        // Play localized TTS binary audio
                         const audioBlob = new Blob([event.data], { type: 'audio/mp3' });
                         const audioUrl = URL.createObjectURL(audioBlob);
                         const audio = new Audio(audioUrl);
@@ -104,7 +115,6 @@
                         speakBtn.innerText = '🔊 Salita is speaking...';
                         speakBtn.disabled = true;
 
-                        // Re-enable button ONLY after Salita finishes speaking
                         audio.onended = () => {
                             speakBtn.disabled = false;
                             speakBtn.innerText = '🎙️ Click to Speak';
@@ -151,7 +161,6 @@
                 speakBtn.innerText = '🔴 Recording... Click to Send';
                 speakBtn.className = 'recording';
             } else {
-                // Stop recording & lock button while processing
                 mediaRecorder.stop();
                 isRecording = false;
                 speakBtn.innerText = '⏳ Salita is thinking...';
@@ -166,6 +175,7 @@
 
             const btn = document.getElementById('callBtn');
             const speakBtn = document.getElementById('speakBtn');
+            const marketSelect = document.getElementById('marketSelect');
 
             document.getElementById('status').innerText = 'Disconnected';
             document.getElementById('status').style.color = 'yellow';
@@ -175,6 +185,7 @@
             speakBtn.innerText = '🎙️ Click to Speak';
             speakBtn.className = 'speak';
             speakBtn.disabled = true;
+            marketSelect.disabled = false; // Re-enable selector
 
             isCalling = false;
             isRecording = false;
